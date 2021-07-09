@@ -22,7 +22,6 @@ import {
  * Internal dependencies
  */
 import styles from './style.scss';
-import HelpDetailNavigationScreen from './help-detail-navigation-screen.js';
 import HelpTopicRow from './help-topic-row.js';
 
 const HELP_TOPICS = [
@@ -74,16 +73,11 @@ function EditorHelpTopics( { isVisible, onClose, getStylesFromColorScheme } ) {
 						} ) }
 					</PanelBody>
 				</BottomSheet.NavigationScreen>
-				{ /* Print out help detail screens */ }
-				{ HELP_TOPICS.map( ( topic ) => {
-					const key = topic.label;
-					return (
-						<HelpDetailNavigationScreen
-							key={ key }
-							name={ topic.label }
-						/>
-					);
-				} ) }
+				<BottomSheet.NavigationScreen
+					name={ BottomSheet.SubSheet.screenName }
+				>
+					<BottomSheet.SubSheet.Slot />
+				</BottomSheet.NavigationScreen>
 			</BottomSheet.NavigationContainer>
 		</BottomSheet>
 	) );
