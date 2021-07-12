@@ -3,6 +3,11 @@
  */
 import { useEffect, useRef } from '@wordpress/element';
 
+/**
+ * External dependencies
+ */
+import { throttle } from 'lodash';
+
 const dragImageClass = 'components-draggable__invisible-drag-image';
 const cloneWrapperClass = 'components-draggable__clone';
 const cloneHeightTransformationBreakpoint = 700;
@@ -18,14 +23,29 @@ const bodyClass = 'is-dragging-components-draggable';
 /**
  * @typedef Props
  * @property {(props: RenderProp) => JSX.Element | null}  children                         Children.
- * @property {(event: import('react').DragEvent) => void} [onDragStart]                    Callback when dragging starts.
- * @property {(event: import('react').DragEvent) => void} [onDragOver]                     Callback when dragging happens over the document.
+ * @property {(event: import('react').DragEvent) => void} [onDragStart]                    Callback when dragging
+ *     starts.
+ * @property {(event: import('react').DragEvent) => void} [onDragOver]                     Callback when dragging
+ *     happens over the document.
  * @property {(event: import('react').DragEvent) => void} [onDragEnd]                      Callback when dragging ends.
- * @property {string}                                     [cloneClassname]                 Classname for the cloned element.
+ * @property {string}                                     [cloneClassname]                 Classname for the cloned
+ *     element.
  * @property {string}                                     [elementId]                      ID for the element.
- * @property {any}                                        [transferData]                   Transfer data for the drag event.
- * @property {string}                                     [__experimentalTransferDataType] The transfer data type to set.
- * @property {import('react').ReactNode}                  __experimentalDragComponent      Component to show when dragging.
+ * @property {any}                                        [transferData]                   Transfer data for the drag
+ *     event.
+ * @property {string}                                     [__experimentalTransferDataType] The transfer data type to
+ *     set.
+ * @property {import('react').ReactNode}                  __experimentalDragComponent      Component to show when
+ *     dragging.
+ */
+
+/**
+ * @typedef DragState
+ * @property {number}                    x            Current X coordinate of cloneWrapper
+ * @property {number}                    y            Current Y coordinate of cloneWrapper
+ * @property {number}                    cursorLeft   Last mouse x coordinate
+ * @property {number}                    cursorTop    Last mouse y coordinate
+ * @property {any}                       cloneWrapper Cloned Draggable
  */
 
 /**
@@ -62,6 +82,25 @@ export default function Draggable( {
 	}
 
 	/**
+	 * @param {import('react').DragEvent} e
+	 * @param {DragState} dragState
+	 */
+	function over( e, dragState ) {
+		const nextX = dragState.x + e.clientX - dragState.cursorLeft;
+		const nextY = dragState.y + e.clientY - dragState.cursorTop;
+		dragState.cloneWrapper.style.transform = `translate( ${ nextX }px, ${ nextY }px )`;
+
+		// Update cursor coordinates.
+		dragState.cursorLeft = e.clientX;
+		dragState.cursorTop = e.clientY;
+		dragState.x = nextX;
+		dragState.y = nextY;
+		if ( onDragOver ) {
+			onDragOver( e );
+		}
+	}
+
+	/**
 	 * This method does a couple of things:
 	 *
 	 * - Clones the current element and spawns clone over original element.
@@ -74,6 +113,8 @@ export default function Draggable( {
 	function start( event ) {
 		// @ts-ignore We know that ownerDocument does exist on an Element
 		const { ownerDocument } = event.target;
+		let x = 0;
+		let y = 0;
 
 		event.dataTransfer.setData(
 			transferDataType,
@@ -81,6 +122,9 @@ export default function Draggable( {
 		);
 
 		const cloneWrapper = ownerDocument.createElement( 'div' );
+		cloneWrapper.style.top = 0;
+		cloneWrapper.style.left = 0;
+
 		const dragImage = ownerDocument.createElement( 'div' );
 
 		// Set a fake drag image to avoid browser defaults. Remove from DOM
@@ -102,8 +146,9 @@ export default function Draggable( {
 		// HTML node and inject it into the cloneWrapper.
 		if ( dragComponentRef.current ) {
 			// Position dragComponent at the same position as the cursor.
-			cloneWrapper.style.top = `${ event.clientY }px`;
-			cloneWrapper.style.left = `${ event.clientX }px`;
+			x = event.clientX;
+			y = event.clientY;
+			cloneWrapper.style.transform = `translate( ${ x }px, ${ y }px )`;
 
 			const clonedDragComponent = ownerDocument.createElement( 'div' );
 			clonedDragComponent.innerHTML = dragComponentRef.current.innerHTML;
@@ -129,19 +174,18 @@ export default function Draggable( {
 
 			if ( elementRect.height > cloneHeightTransformationBreakpoint ) {
 				// Scale down clone if original element is larger than 700px.
-				cloneWrapper.style.transform = 'scale(0.5)';
-				cloneWrapper.style.transformOrigin = 'top left';
+				//TODO: find the original use case
+				//cloneWrapper.style.transform = 'scale(0.5)';
+				//cloneWrapper.style.transformOrigin = 'top left';
 				// Position clone near the cursor.
-				cloneWrapper.style.top = `${ event.clientY - 100 }px`;
-				cloneWrapper.style.left = `${ event.clientX }px`;
+				x = event.clientX;
+				y = event.clientY - 100;
+				cloneWrapper.style.transform = `translate( ${ x }px, ${ y }px )`;
 			} else {
 				// Position clone right over the original element (20px padding).
-				cloneWrapper.style.top = `${
-					elementTopOffset - clonePadding
-				}px`;
-				cloneWrapper.style.left = `${
-					elementLeftOffset - clonePadding
-				}px`;
+				x = elementLeftOffset - clonePadding;
+				y = elementTopOffset - clonePadding;
+				cloneWrapper.style.transform = `translate( ${ x }px, ${ y }px )`;
 			}
 
 			// Hack: Remove iFrames as it's causing the embeds drag clone to freeze
@@ -156,30 +200,31 @@ export default function Draggable( {
 		}
 
 		// Mark the current cursor coordinates.
-		let cursorLeft = event.clientX;
-		let cursorTop = event.clientY;
+		const dragState = {
+			x,
+			y,
+			cursorLeft: event.clientX,
+			cursorTop: event.clientY,
+			cloneWrapper,
+		};
 
 		/**
-		 * @param {import('react').DragEvent} e
+		 * @param {import("react").DragEvent<Element>} e
 		 */
-		function over( e ) {
-			cloneWrapper.style.top = `${
-				parseInt( cloneWrapper.style.top, 10 ) + e.clientY - cursorTop
-			}px`;
-			cloneWrapper.style.left = `${
-				parseInt( cloneWrapper.style.left, 10 ) + e.clientX - cursorLeft
-			}px`;
-
-			// Update cursor coordinates.
-			cursorLeft = e.clientX;
-			cursorTop = e.clientY;
-
-			if ( onDragOver ) {
-				onDragOver( e );
+		function update( e ) {
+			if (
+				dragState.cursorLeft === e.clientX &&
+				dragState.cursorTop === e.clientY
+			) {
+				return;
 			}
+			over( e, dragState );
 		}
 
-		ownerDocument.addEventListener( 'dragover', over );
+		/**
+		 * @param {import("react").DragEvent<Element>} e
+		 */
+		ownerDocument.addEventListener( 'dragover', throttle( update, 16 ) );
 
 		// Update cursor to 'grabbing', document wide.
 		ownerDocument.body.classList.add( bodyClass );

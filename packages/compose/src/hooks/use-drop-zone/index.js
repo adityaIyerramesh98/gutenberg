@@ -94,28 +94,29 @@ export default function useDropZone( {
 				return false;
 			}
 
+			//TODO: this is just to highlight the potential performance gains
 			function maybeDragStart( /** @type {DragEvent} */ event ) {
-				if ( isDragging ) {
-					return;
-				}
-
-				isDragging = true;
-
-				ownerDocument.removeEventListener(
-					'dragenter',
-					maybeDragStart
-				);
-
-				// Note that `dragend` doesn't fire consistently for file and
-				// HTML drag events where the drag origin is outside the browser
-				// window. In Firefox it may also not fire if the originating
-				// node is removed.
-				ownerDocument.addEventListener( 'dragend', maybeDragEnd );
-				ownerDocument.addEventListener( 'mousemove', maybeDragEnd );
-
-				if ( onDragStartRef.current ) {
-					onDragStartRef.current( event );
-				}
+				// if ( isDragging ) {
+				// 	return;
+				// }
+				//
+				// isDragging = true;
+				//
+				// ownerDocument.removeEventListener(
+				// 	'dragenter',
+				// 	maybeDragStart
+				// );
+				//
+				// // Note that `dragend` doesn't fire consistently for file and
+				// // HTML drag events where the drag origin is outside the browser
+				// // window. In Firefox it may also not fire if the originating
+				// // node is removed.
+				// ownerDocument.addEventListener( 'dragend', maybeDragEnd );
+				// ownerDocument.addEventListener( 'mousemove', maybeDragEnd );
+				//
+				// if ( onDragStartRef.current ) {
+				// 	onDragStartRef.current( event );
+				// }
 			}
 
 			function onDragEnter( /** @type {DragEvent} */ event ) {
@@ -139,33 +140,33 @@ export default function useDropZone( {
 			}
 
 			function onDragOver( /** @type {DragEvent} */ event ) {
-				// Only call onDragOver for the innermost hovered drop zones.
-				if ( ! event.defaultPrevented && onDragOverRef.current ) {
-					onDragOverRef.current( event );
-				}
-
-				// Prevent the browser default while also signalling to parent
-				// drop zones that `onDragOver` is already handled.
-				event.preventDefault();
+				// // Only call onDragOver for the innermost hovered drop zones.
+				// if ( ! event.defaultPrevented && onDragOverRef.current ) {
+				// 	onDragOverRef.current( event );
+				// }
+				//
+				// // Prevent the browser default while also signalling to parent
+				// // drop zones that `onDragOver` is already handled.
+				// event.preventDefault();
 			}
 
 			function onDragLeave( /** @type {DragEvent} */ event ) {
-				// The `dragleave` event will also fire when leaving child
-				// elements, but we only want to call `onDragLeave` when
-				// leaving the drop zone, which means the `relatedTarget`
-				// (element that has been entered) should be outside the drop
-				// zone.
-				if (
-					isElementInZone(
-						/** @type {HTMLElement|null} */ ( event.relatedTarget )
-					)
-				) {
-					return;
-				}
-
-				if ( onDragLeaveRef.current ) {
-					onDragLeaveRef.current( event );
-				}
+				// // The `dragleave` event will also fire when leaving child
+				// // elements, but we only want to call `onDragLeave` when
+				// // leaving the drop zone, which means the `relatedTarget`
+				// // (element that has been entered) should be outside the drop
+				// // zone.
+				// if (
+				// 	isElementInZone(
+				// 		/** @type {HTMLElement|null} */ ( event.relatedTarget )
+				// 	)
+				// ) {
+				// 	return;
+				// }
+				//
+				// if ( onDragLeaveRef.current ) {
+				// 	onDragLeaveRef.current( event );
+				// }
 			}
 
 			function onDrop( /** @type {DragEvent} */ event ) {

@@ -21,7 +21,9 @@ export function usePopoverScroll( scrollableRef ) {
 				const { deltaX, deltaY } = event;
 				scrollableRef.current.scrollBy( deltaX, deltaY );
 			}
-			node.addEventListener( 'wheel', onWheel );
+			//TODO: feature detect passive option, otherwise third arg is true
+			// Let the browser know that we won't cancel the scroll event
+			node.addEventListener( 'wheel', onWheel, { passive: true } );
 			return () => {
 				node.removeEventListener( 'wheel', onWheel );
 			};
