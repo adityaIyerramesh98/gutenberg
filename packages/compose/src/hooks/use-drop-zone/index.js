@@ -9,6 +9,11 @@ import { useRef } from '@wordpress/element';
  */
 import useRefEffect from '../use-ref-effect';
 
+/**
+ * External dependencies
+ */
+import { throttle } from 'lodash';
+
 /* eslint-disable jsdoc/valid-types */
 /**
  * @template T
@@ -30,6 +35,17 @@ function useFreshRef( value ) {
 	ref.current = value;
 	return ref;
 }
+//TODO: only add this detection once, find a good spot for reuse
+const intentState = { x: null, y: null, isHovering: false };
+function isHovering( event ) {
+	const x = intentState?.x ?? event.clientX;
+	const y = intentState?.y ?? event.clientY;
+	intentState.x = event.clientX;
+	intentState.y = event.clientY;
+	intentState.isHovering =
+		Math.abs( event.clientY - y ) + Math.abs( event.clientX - x ) <= 5;
+}
+document.addEventListener( 'dragover', throttle( isHovering, 100 ) );
 
 /**
  * A hook to facilitate drag and drop handling.
@@ -97,27 +113,27 @@ export default function useDropZone( {
 
 			//TODO: this is just to highlight the potential performance gains
 			function maybeDragStart( /** @type {DragEvent} */ event ) {
-				// if ( isDragging ) {
-				// 	return;
-				// }
-				//
-				// isDragging = true;
-				//
-				// ownerDocument.removeEventListener(
-				// 	'dragenter',
-				// 	maybeDragStart
-				// );
-				//
-				// // Note that `dragend` doesn't fire consistently for file and
-				// // HTML drag events where the drag origin is outside the browser
-				// // window. In Firefox it may also not fire if the originating
-				// // node is removed.
-				// ownerDocument.addEventListener( 'dragend', maybeDragEnd );
-				// ownerDocument.addEventListener( 'mousemove', maybeDragEnd );
-				//
-				// if ( onDragStartRef.current ) {
-				// 	onDragStartRef.current( event );
-				// }
+				if ( isDragging ) {
+					return;
+				}
+
+				isDragging = true;
+
+				ownerDocument.removeEventListener(
+					'dragenter',
+					maybeDragStart
+				);
+
+				// Note that `dragend` doesn't fire consistently for file and
+				// HTML drag events where the drag origin is outside the browser
+				// window. In Firefox it may also not fire if the originating
+				// node is removed.
+				ownerDocument.addEventListener( 'dragend', maybeDragEnd );
+				ownerDocument.addEventListener( 'mousemove', maybeDragEnd );
+
+				if ( onDragStartRef.current ) {
+					onDragStartRef.current( event );
+				}
 			}
 
 			function onDragEnter( /** @type {DragEvent} */ event ) {
@@ -140,34 +156,38 @@ export default function useDropZone( {
 				}
 			}
 
+			//TODO: this still fires too many times
 			function onDragOver( /** @type {DragEvent} */ event ) {
-				// // Only call onDragOver for the innermost hovered drop zones.
-				// if ( ! event.defaultPrevented && onDragOverRef.current ) {
-				// 	onDragOverRef.current( event );
-				// }
-				//
-				// // Prevent the browser default while also signalling to parent
-				// // drop zones that `onDragOver` is already handled.
-				// event.preventDefault();
+				// Only call onDragOver for the innermost hovered drop zones.
+				if (
+					! event.defaultPrevented &&
+					onDragOverRef.current &&
+					intentState.isHovering
+				) {
+					onDragOverRef.current( event );
+				}
+				// Prevent the browser default while also signalling to parent
+				// drop zones that `onDragOver` is already handled.
+				event.preventDefault();
 			}
 
 			function onDragLeave( /** @type {DragEvent} */ event ) {
-				// // The `dragleave` event will also fire when leaving child
-				// // elements, but we only want to call `onDragLeave` when
-				// // leaving the drop zone, which means the `relatedTarget`
-				// // (element that has been entered) should be outside the drop
-				// // zone.
-				// if (
-				// 	isElementInZone(
-				// 		/** @type {HTMLElement|null} */ ( event.relatedTarget )
-				// 	)
-				// ) {
-				// 	return;
-				// }
-				//
-				// if ( onDragLeaveRef.current ) {
-				// 	onDragLeaveRef.current( event );
-				// }
+				// The `dragleave` event will also fire when leaving child
+				// elements, but we only want to call `onDragLeave` when
+				// leaving the drop zone, which means the `relatedTarget`
+				// (element that has been entered) should be outside the drop
+				// zone.
+				if (
+					isElementInZone(
+						/** @type {HTMLElement|null} */ ( event.relatedTarget )
+					)
+				) {
+					return;
+				}
+
+				if ( onDragLeaveRef.current ) {
+					onDragLeaveRef.current( event );
+				}
 			}
 
 			function onDrop( /** @type {DragEvent} */ event ) {
